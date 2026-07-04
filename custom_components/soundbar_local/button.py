@@ -71,6 +71,7 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
             identifiers={(DOMAIN, host)},
             connections=connections,
             manufacturer="Samsung",
+            configuration_url=f"https://{host}:1516/",
             model=data.get("model") or "Soundbar",
             model_id=coordinator.data.get("identifier"),
             # Explicitly clear serial_number - an earlier revision incorrectly

@@ -95,6 +95,11 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             identifiers={(DOMAIN, host)},
             connections=connections,
             manufacturer="Samsung",
+            # Links the device page's "Visit" button at the soundbar's own
+            # local JSON-RPC control API. It won't render anything useful in
+            # a browser (it only speaks JSON-RPC POST), but it's a handy
+            # one-click way to confirm the host/port this integration talks to.
+            configuration_url=f"https://{host}:1516/",
             model=data.get("model") or "Soundbar",
             # getIdentifier() returns a per-*model* string (e.g.
             # "22_AV_HW-S67GD"), not a per-unit serial - expose it as the
