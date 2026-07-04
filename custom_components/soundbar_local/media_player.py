@@ -132,7 +132,10 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
-        await self._soundbar.set_volume(int(volume * 100))
+        # round(), not int(): truncating float->int here systematically
+        # rounds down (e.g. a 0.5 slider position can compute as 49.999...
+        # and land on 49 instead of 50).
+        await self._soundbar.set_volume(round(volume * 100))
         await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:

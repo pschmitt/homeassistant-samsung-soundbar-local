@@ -87,16 +87,33 @@ class AsyncSoundbar:
     async def mute_toggle(self):    await self._call("remoteKeyControl", remoteKey="MUTE")
 
     async def set_volume(self, level: int):
+        """Step the volume up/down until it reaches `level`.
+
+        There's no direct "set to N" call, only relative VOL_UP/VOL_DOWN
+        steps, so this re-reads the actual device volume after every step
+        instead of trusting a locally-simulated counter. A single VOL_UP/
+        VOL_DOWN doesn't always move the volume by exactly 1 (it can be
+        coalesced or dropped under rapid calls), so assuming it does drifts
+        the simulated value away from the real one - which is what then
+        shows up as a "weird in-between" volume once the coordinator polls
+        the device's actual state.
+        """
         if not 0 <= level <= 100:
             raise ValueError("Volume has to be in range 0–100")
         current = await self.volume()
+        stalled = 0
         while current != level:
             if current < level:
                 await self.volume_up()
-                current += 1
             else:
                 await self.volume_down()
-                current -= 1
+            new = await self.volume()
+            stalled = stalled + 1 if new == current else 0
+            current = new
+            if stalled >= 3:
+                # The device isn't moving anymore (e.g. hit a hard limit) -
+                # stop instead of spinning forever.
+                break
 
     # Input & sound mode ---------------------
     async def select_input(self, src: str):
