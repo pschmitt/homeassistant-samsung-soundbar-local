@@ -73,6 +73,9 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
             manufacturer="Samsung",
             model=data.get("model") or "Soundbar",
             model_id=coordinator.data.get("identifier"),
+            # Explicitly clear serial_number - an earlier revision incorrectly
+            # set it, and omitting the key would leave that value in place.
+            serial_number=None,
             sw_version=data.get("firmware"),
             name=device_name,
         )

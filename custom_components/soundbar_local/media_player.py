@@ -98,8 +98,13 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             model=data.get("model") or "Soundbar",
             # getIdentifier() returns a per-*model* string (e.g.
             # "22_AV_HW-S67GD"), not a per-unit serial - expose it as the
-            # model identifier, not as serial_number.
+            # model identifier, not as serial_number. Explicitly clear
+            # serial_number (rather than omitting the key) since an earlier
+            # revision of this integration incorrectly set it to that value;
+            # omitting the key leaves an existing device registry value
+            # untouched instead of clearing it.
             model_id=coordinator.data.get("identifier"),
+            serial_number=None,
             sw_version=data.get("firmware"),
             name=name,
         )
