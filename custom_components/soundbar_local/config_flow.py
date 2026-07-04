@@ -126,6 +126,15 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         host = discovery_info.ip
         mac = format_mac(discovery_info.macaddress)
 
+        # Safety net: an existing entry's unique_id is only migrated from the
+        # host to the MAC once its own async_setup_entry() has run and
+        # successfully resolved a MAC (see __init__.py) - if this DHCP event
+        # fires before that (e.g. early in startup, or the MAC/Tizen lookup
+        # failed that boot), unique_id matching below would miss it and we'd
+        # create a second entry for the same IP. Matching on the host
+        # directly closes that gap regardless of migration timing.
+        self._async_abort_entries_match({CONF_HOST: host})
+
         await self.async_set_unique_id(mac)
         # Already configured: silently repoint it at the new IP and stop -
         # this is the "device moved" case, no user interaction needed.
