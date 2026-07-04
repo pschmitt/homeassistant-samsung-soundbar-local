@@ -82,6 +82,9 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             manufacturer="Samsung",
             model="Soundbar",
             name=self._attr_name,
+            # Lets netbox_asset_tag (and similar) match this device against
+            # inventory by serial instead of by IP.
+            serial_number=coordinator.data.get("identifier"),
         )
 
     # ---------- control ----------

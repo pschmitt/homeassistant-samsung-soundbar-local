@@ -64,6 +64,7 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
             manufacturer="Samsung",
             model="Soundbar",
             name=f"Soundbar {host}",
+            serial_number=coordinator.data.get("identifier"),
         )
         self._action = action
 

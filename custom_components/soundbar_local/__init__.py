@@ -56,9 +56,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
+    # The soundbar's IP is used as the config entry's unique_id historically,
+    # but it's a connection detail, not a stable device identity - it changes
+    # if the device gets a new DHCP lease. Once we can read the device's own
+    # identifier, migrate the unique_id to it so a later reconfigure (IP
+    # change) can tell "same device, new address" apart from "different
+    # device" via _abort_if_unique_id_mismatch().
+    identifier = coordinator.data.get("identifier")
+    if identifier and entry.unique_id != identifier:
+        hass.config_entries.async_update_entry(entry, unique_id=identifier)
+
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "soundbar": soundbar,
+        "identifier": identifier,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

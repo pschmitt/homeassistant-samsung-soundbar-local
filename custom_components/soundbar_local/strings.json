@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the soundbar",
+        "data": {
+          "host": "Host / IP address",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      },
+      "reconfigure": {
+        "title": "Update the soundbar connection",
+        "description": "Use this after the soundbar's IP address changes.",
+        "data": {
+          "host": "Host / IP address",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Couldn't reach the soundbar. Check the host/IP and that IP control is enabled on the device."
+    },
+    "abort": {
+      "already_configured": "This soundbar is already configured.",
+      "already_in_progress": "A configuration flow for this soundbar is already in progress.",
+      "reconfigure_successful": "Soundbar connection updated.",
+      "wrong_device": "This is a different soundbar than the one currently configured here. Use \"Add integration\" to add it separately instead."
+    }
+  }
+}
