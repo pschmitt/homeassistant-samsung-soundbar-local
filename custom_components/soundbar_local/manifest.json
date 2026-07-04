@@ -1,11 +1,19 @@
 {
   "domain": "soundbar_local",
   "name": "Samsung Soundbar Local",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "config_flow": true,
   "iot_class": "local_polling",
   "requirements": ["aiohttp>=3.8"],
   "codeowners": ["@ZtF", "@pschmitt"],
   "documentation": "https://github.com/pschmitt/homeassistant-samsung-soundbar-local",
-  "issue_tracker": "https://github.com/pschmitt/homeassistant-samsung-soundbar-local/issues"
+  "issue_tracker": "https://github.com/pschmitt/homeassistant-samsung-soundbar-local/issues",
+  "dhcp": [
+    {
+      "macaddress": "B0E45C*"
+    },
+    {
+      "registered_devices": true
+    }
+  ]
 }

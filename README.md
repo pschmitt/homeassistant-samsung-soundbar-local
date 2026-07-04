@@ -54,6 +54,21 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
   correctly recognizes "same device, new address" instead of aborting as a
   mismatch - unlike `getIdentifier`, the MAC is actually unique per physical
   unit.
+- **DHCP discovery, including auto-repointing on IP change**: this soundbar
+  runs the same Tizen stack as Samsung Smart TVs and exposes the same
+  unauthenticated info endpoint (`http://<host>:8001/api/v2/`, see
+  `tizen_info.py`) used by the official `samsungtv` integration. It's queried
+  for the device's own display name (e.g. "Living room speaker", as set in
+  the SmartThings app), model number and MAC - none of which are available
+  over the JSON-RPC control API on port 1516. `manifest.json` declares two
+  `dhcp` matchers: the soundbar's MAC OUI (`B0E45C*`, for genuinely new
+  devices - actively probed via the control API before showing a discovery
+  prompt, since the OUI is shared with other Samsung product lines) and
+  `registered_devices: true` (so an already-configured soundbar that gets a
+  new DHCP lease has its host silently updated in place - the same mechanism
+  as [home-assistant/core#175327](https://github.com/home-assistant/core/pull/175327)).
+  The device's own name is also used as the default entity/device name
+  instead of `Soundbar <ip>`.
 
 ---
 

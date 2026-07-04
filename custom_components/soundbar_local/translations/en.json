@@ -15,6 +15,10 @@
           "host": "Host / IP address",
           "verify_ssl": "Verify SSL certificate"
         }
+      },
+      "discovery_confirm": {
+        "title": "Add discovered soundbar",
+        "description": "Add \"{name}\" as a Samsung Soundbar Local device?"
       }
     },
     "error": {
@@ -24,7 +28,8 @@
       "already_configured": "This soundbar is already configured.",
       "already_in_progress": "A configuration flow for this soundbar is already in progress.",
       "reconfigure_successful": "Soundbar connection updated.",
-      "wrong_device": "This is a different soundbar than the one currently configured here. Use \"Add integration\" to add it separately instead."
+      "wrong_device": "This is a different soundbar than the one currently configured here. Use \"Add integration\" to add it separately instead.",
+      "not_soundbar_device": "This device didn't respond to the soundbar's control API, so it wasn't added."
     }
   }
 }

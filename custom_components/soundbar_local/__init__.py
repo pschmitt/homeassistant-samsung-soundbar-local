@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -24,6 +25,7 @@ from .const import (
 )
 from .helpers import get_mac_address
 from .soundbar import AsyncSoundbar, SoundbarApiError
+from .tizen_info import async_get_tizen_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,10 +65,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # but must not be used to key unique_id or serial_number.
     identifier = coordinator.data.get("identifier")
 
-    # The soundbar's protocol has no MAC query either, so look it up
-    # best-effort in the kernel neighbor (ARP) table - the polling traffic
-    # above should have just populated it.
-    mac = await hass.async_add_executor_job(get_mac_address, entry.data[CONF_HOST])
+    # This soundbar runs the same Tizen stack as Samsung Smart TVs and
+    # exposes the same unauthenticated info endpoint (port 8001), which
+    # conveniently has the device's own display name, model number, MAC and
+    # firmware version - none of which are available over the JSON-RPC
+    # control API on port 1516.
+    tizen_info = await async_get_tizen_info(session, entry.data[CONF_HOST]) or {}
+    device_name = tizen_info.get("name")
+    model = tizen_info.get("model")
+    firmware = tizen_info.get("firmware")
+
+    mac = tizen_info.get("mac")
+    if not mac:
+        # Fall back to a best-effort ARP-table lookup (same technique as
+        # homeassistant-tesmart-kvm) if the Tizen endpoint didn't answer.
+        mac = await hass.async_add_executor_job(get_mac_address, entry.data[CONF_HOST])
+    if mac:
+        mac = format_mac(mac)
 
     # The soundbar's IP is used as the config entry's unique_id historically,
     # but it's a connection detail, not a stable device identity - it changes
@@ -82,6 +97,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "soundbar": soundbar,
         "identifier": identifier,
         "mac": mac,
+        "device_name": device_name,
+        "model": model,
+        "firmware": firmware,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
