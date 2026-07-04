@@ -80,6 +80,8 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
         super().__init__(coordinator)
         self._soundbar = soundbar
         self._entry = entry
+        # Set while a volume_set is in flight - see async_set_volume_level().
+        self._optimistic_volume: float | None = None
 
         host = entry.data["host"]
         mac = data.get("mac")
@@ -133,11 +135,23 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_set_volume_level(self, volume: float) -> None:
-        # round(), not int(): truncating float->int here systematically
-        # rounds down (e.g. a 0.5 slider position can compute as 49.999...
-        # and land on 49 instead of 50).
-        await self._soundbar.set_volume(round(volume * 100))
-        await self.coordinator.async_request_refresh()
+        # There's no direct "set volume to N" call - set_volume() walks
+        # there one VOL_UP/VOL_DOWN step at a time (see soundbar.py), which
+        # is visibly slow for a big jump. Report the requested value right
+        # away instead of leaving the UI on the old one for the several
+        # seconds that takes; async_request_refresh() below reconciles it
+        # against the real device value once the walk finishes (or clears
+        # the optimistic guess if it failed partway).
+        self._optimistic_volume = volume
+        self.async_write_ha_state()
+        try:
+            # round(), not int(): truncating float->int here systematically
+            # rounds down (e.g. a 0.5 slider position can compute as
+            # 49.999... and land on 49 instead of 50).
+            await self._soundbar.set_volume(round(volume * 100))
+        finally:
+            self._optimistic_volume = None
+            await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:
         if mute != self.is_volume_muted:
@@ -160,6 +174,8 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
 
     @property
     def volume_level(self):
+        if self._optimistic_volume is not None:
+            return self._optimistic_volume
         return self.coordinator.data.get("volume", 0) / 100
 
     @property

@@ -88,6 +88,12 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
   as an unexpected "in-between" volume once the coordinator polled the real
   state. It now re-reads the actual volume after every step instead (with a
   stall guard so it gives up instead of looping forever at a hard limit).
+- **Optimistic volume_set**: walking to the target one step at a time is
+  visibly slow for a big jump, so `async_set_volume_level()` reports the
+  requested value immediately instead of leaving the UI on the old value
+  for the several seconds the walk takes. The optimistic guess is cleared
+  as soon as the walk finishes (success or failure), at which point the
+  coordinator refresh takes back over with the real value.
 
 ---
 
