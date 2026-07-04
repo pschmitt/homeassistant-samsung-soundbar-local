@@ -26,6 +26,7 @@ from .const import (
 from .helpers import get_mac_address
 from .soundbar import AsyncSoundbar, SoundbarApiError
 from .tizen_info import async_get_tizen_info
+from .upnp_info import async_get_upnp_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +76,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     model = tizen_info.get("model")
     firmware = tizen_info.get("firmware")
 
+    # The device's UPnP "IP Control" descriptor (port 9110) has its actual
+    # printed serial number, which neither the JSON-RPC control API nor the
+    # Tizen info endpoint expose. Used as a fallback for name/model too, in
+    # case the Tizen endpoint didn't answer.
+    upnp_info = await async_get_upnp_info(session, entry.data[CONF_HOST]) or {}
+    serial_number = upnp_info.get("serial_number")
+    device_name = device_name or upnp_info.get("friendly_name")
+    model = model or upnp_info.get("model_name")
+
     mac = tizen_info.get("mac")
     if not mac:
         # Fall back to a best-effort ARP-table lookup (same technique as
@@ -100,6 +110,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "device_name": device_name,
         "model": model,
         "firmware": firmware,
+        "serial_number": serial_number,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -103,13 +103,14 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             model=data.get("model") or "Soundbar",
             # getIdentifier() returns a per-*model* string (e.g.
             # "22_AV_HW-S67GD"), not a per-unit serial - expose it as the
-            # model identifier, not as serial_number. Explicitly clear
-            # serial_number (rather than omitting the key) since an earlier
-            # revision of this integration incorrectly set it to that value;
-            # omitting the key leaves an existing device registry value
-            # untouched instead of clearing it.
+            # model identifier, not as serial_number.
             model_id=coordinator.data.get("identifier"),
-            serial_number=None,
+            # The real, printed serial - from the UPnP "IP Control"
+            # descriptor (port 9110), not from the JSON-RPC/Tizen APIs.
+            # Passed explicitly (even when None) rather than omitted, since
+            # an earlier revision incorrectly set this to the model_id value
+            # and omitting the key would leave that stale value in place.
+            serial_number=data.get("serial_number"),
             sw_version=data.get("firmware"),
             name=name,
         )

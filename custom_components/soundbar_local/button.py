@@ -74,9 +74,8 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
             configuration_url=f"https://{host}:1516/",
             model=data.get("model") or "Soundbar",
             model_id=coordinator.data.get("identifier"),
-            # Explicitly clear serial_number - an earlier revision incorrectly
-            # set it, and omitting the key would leave that value in place.
-            serial_number=None,
+            # The real, printed serial - see media_player.py.
+            serial_number=data.get("serial_number"),
             sw_version=data.get("firmware"),
             name=device_name,
         )

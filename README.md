@@ -43,9 +43,15 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
   this to identify the device.
 - **`getIdentifier` is not a serial number**: it turns out to be a
   per-*model* string (e.g. `22_AV_HW-S67GD`, shared by every unit of that
-  model), not a per-unit serial - Samsung's local API has no way to read the
-  device's actual printed serial. It's surfaced as `model_id` on the device
+  model), not a per-unit serial. It's surfaced as `model_id` on the device
   instead of (incorrectly) as `serial_number`.
+- **Real serial number**: the device's actual printed serial *is* available,
+  just not from the JSON-RPC or Tizen APIs - it's in the UPnP "IP Control"
+  device descriptor at `http://<host>:9110/ip_control` (the same one SSDP
+  advertises for `urn:samsung.com:device:IPControlServer:1`; see
+  `upnp_info.py`). Surfaced as the real `serial_number` on the device, which
+  is what lets inventory tools like NetBox asset-tag matching identify this
+  exact unit (not just its model).
 - **Reconfigure support**: `config_flow.py` now implements
   `async_step_reconfigure`, so a device whose IP changed can be repointed via
   **Settings → Devices & Services → (device) → ⋮ → Reconfigure** instead of
@@ -69,6 +75,19 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
   as [home-assistant/core#175327](https://github.com/home-assistant/core/pull/175327)).
   The device's own name is also used as the default entity/device name
   instead of `Soundbar <ip>`.
+- **"Visit" button**: `DeviceInfo.configuration_url` points at
+  `https://<host>:1516/`, the soundbar's own JSON-RPC control endpoint. It
+  won't render anything useful in a browser (JSON-RPC POST only), but it's a
+  one-click way to confirm which host/port the integration is talking to.
+- **Volume no longer drifts**: there's no direct "set volume to N" call,
+  only relative `VOL_UP`/`VOL_DOWN` steps, and the original `set_volume()`
+  tracked progress with a locally-simulated counter instead of the device's
+  real volume. A single step doesn't always move by exactly 1 (coalesced or
+  dropped under rapid calls), so the simulated counter could drift from
+  reality and the loop would declare success on the wrong value - showing up
+  as an unexpected "in-between" volume once the coordinator polled the real
+  state. It now re-reads the actual volume after every step instead (with a
+  stall guard so it gives up instead of looping forever at a hard limit).
 
 ---
 
