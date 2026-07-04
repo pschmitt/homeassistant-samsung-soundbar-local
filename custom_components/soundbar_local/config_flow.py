@@ -11,6 +11,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import aiohttp_client
 
 from .const import CONF_VERIFY_SSL, DOMAIN
+from .helpers import get_mac_address
 from .soundbar import AsyncSoundbar, SoundbarApiError
 
 
@@ -31,8 +32,15 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def _async_get_identifier(self, user_input: dict[str, Any]) -> str | None:
-        """Probe the soundbar and return its device identifier, if any."""
+    async def _async_probe(self, user_input: dict[str, Any]) -> str | None:
+        """Connect to the soundbar and return its MAC address, if any.
+
+        Raises SoundbarApiError if the device can't be reached. The MAC
+        lookup is best-effort (ARP-table, populated by this same request) and
+        is not required for the probe to be considered successful; the
+        soundbar's own `getIdentifier` is a per-*model* string, not a
+        per-unit serial, so it isn't usable as a unique_id.
+        """
         session = aiohttp_client.async_get_clientsession(
             self.hass, verify_ssl=user_input.get(CONF_VERIFY_SSL, False)
         )
@@ -41,7 +49,10 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             session=session,
             verify_ssl=user_input.get(CONF_VERIFY_SSL, False),
         )
-        return await soundbar.identifier()
+        await soundbar.identifier()
+        return await self.hass.async_add_executor_job(
+            get_mac_address, user_input[CONF_HOST]
+        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -51,14 +62,14 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                identifier = await self._async_get_identifier(user_input)
+                mac = await self._async_probe(user_input)
             except SoundbarApiError:
                 errors["base"] = "cannot_connect"
             else:
-                # Prefer the soundbar's own identifier as the unique_id so a
-                # later IP change doesn't look like a new device; fall back
-                # to the host if the device didn't return one.
-                await self.async_set_unique_id(identifier or user_input[CONF_HOST])
+                # Prefer the soundbar's MAC as the unique_id so a later IP
+                # change doesn't look like a new device; fall back to the
+                # host if the MAC couldn't be resolved.
+                await self.async_set_unique_id(mac or user_input[CONF_HOST])
                 self._abort_if_unique_id_configured(updates=user_input)
                 return self.async_create_entry(
                     title=user_input[CONF_HOST], data=user_input
@@ -77,11 +88,11 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                identifier = await self._async_get_identifier(user_input)
+                mac = await self._async_probe(user_input)
             except SoundbarApiError:
                 errors["base"] = "cannot_connect"
             else:
-                await self.async_set_unique_id(identifier or entry.unique_id)
+                await self.async_set_unique_id(mac or entry.unique_id)
                 self._abort_if_unique_id_mismatch(reason="wrong_device")
                 return self.async_update_reload_and_abort(entry, data=user_input)
 

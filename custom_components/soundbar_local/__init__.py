@@ -22,6 +22,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
+from .helpers import get_mac_address
 from .soundbar import AsyncSoundbar, SoundbarApiError
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,20 +57,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
+    # `getIdentifier` turns out to be a per-*model* string (e.g.
+    # "22_AV_HW-S67GD"), not a per-unit serial - it's shared by every soundbar
+    # of the same model, so it's exposed as model_id (see media_player.py)
+    # but must not be used to key unique_id or serial_number.
+    identifier = coordinator.data.get("identifier")
+
+    # The soundbar's protocol has no MAC query either, so look it up
+    # best-effort in the kernel neighbor (ARP) table - the polling traffic
+    # above should have just populated it.
+    mac = await hass.async_add_executor_job(get_mac_address, entry.data[CONF_HOST])
+
     # The soundbar's IP is used as the config entry's unique_id historically,
     # but it's a connection detail, not a stable device identity - it changes
-    # if the device gets a new DHCP lease. Once we can read the device's own
-    # identifier, migrate the unique_id to it so a later reconfigure (IP
-    # change) can tell "same device, new address" apart from "different
-    # device" via _abort_if_unique_id_mismatch().
-    identifier = coordinator.data.get("identifier")
-    if identifier and entry.unique_id != identifier:
-        hass.config_entries.async_update_entry(entry, unique_id=identifier)
+    # if the device gets a new DHCP lease. Once we have the device's MAC
+    # (genuinely unique per physical unit), migrate the unique_id to it so a
+    # later reconfigure (IP change) can tell "same device, new address" apart
+    # from "different device" via _abort_if_unique_id_mismatch().
+    if mac and entry.unique_id != mac:
+        hass.config_entries.async_update_entry(entry, unique_id=mac)
 
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "soundbar": soundbar,
         "identifier": identifier,
+        "mac": mac,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -6,6 +6,7 @@ from collections.abc import Callable, Awaitable
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -19,6 +20,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
     coordinator = data["coordinator"]
     soundbar: AsyncSoundbar = data["soundbar"]
     host = entry.data["host"]
+    mac = data.get("mac")
 
     async_add_entities(
         [
@@ -26,6 +28,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 coordinator,
                 soundbar,
                 host,
+                mac,
                 "woofer_plus",
                 "Woofer +",
                 soundbar.sub_plus,
@@ -34,6 +37,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 coordinator,
                 soundbar,
                 host,
+                mac,
                 "woofer_minus",
                 "Woofer -",
                 soundbar.sub_minus,
@@ -51,6 +55,7 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
         coordinator,
         soundbar: AsyncSoundbar,
         host: str,
+        mac: str | None,
         unique_suffix: str,
         label: str,
         action: Callable[[], Awaitable[None]],
@@ -59,12 +64,14 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
         self._soundbar = soundbar
         self._attr_unique_id = f"{host}_{unique_suffix}"
         self._attr_name = f"Soundbar {host} {label}"
+        connections = {(CONNECTION_NETWORK_MAC, format_mac(mac))} if mac else set()
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, host)},
+            connections=connections,
             manufacturer="Samsung",
             model="Soundbar",
+            model_id=coordinator.data.get("identifier"),
             name=f"Soundbar {host}",
-            serial_number=coordinator.data.get("identifier"),
         )
         self._action = action
 

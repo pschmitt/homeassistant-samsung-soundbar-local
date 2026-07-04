@@ -11,6 +11,7 @@ from homeassistant.components.media_player import (
 )
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import callback
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -57,8 +58,11 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     data = hass.data[DOMAIN][entry.entry_id]
     coordinator = data["coordinator"]
     soundbar: AsyncSoundbar = data["soundbar"]
+    mac = data.get("mac")
 
-    async_add_entities([SoundbarLocalEntity(coordinator, soundbar, entry)], True)
+    async_add_entities(
+        [SoundbarLocalEntity(coordinator, soundbar, entry, mac)], True
+    )
 
 
 class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
@@ -69,7 +73,13 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
     _attr_sound_mode_list = _SOUND_MODES
     _attr_device_class = MediaPlayerDeviceClass.SPEAKER
 
-    def __init__(self, coordinator, soundbar: AsyncSoundbar, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        coordinator,
+        soundbar: AsyncSoundbar,
+        entry: ConfigEntry,
+        mac: str | None = None,
+    ) -> None:
         super().__init__(coordinator)
         self._soundbar = soundbar
         self._entry = entry
@@ -77,14 +87,17 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
         host = entry.data["host"]
         self._attr_unique_id = host
         self._attr_name = f"Soundbar {host}"
+        connections = {(CONNECTION_NETWORK_MAC, format_mac(mac))} if mac else set()
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, host)},
+            connections=connections,
             manufacturer="Samsung",
             model="Soundbar",
+            # getIdentifier() returns a per-*model* string (e.g.
+            # "22_AV_HW-S67GD"), not a per-unit serial - expose it as the
+            # model identifier, not as serial_number.
+            model_id=coordinator.data.get("identifier"),
             name=self._attr_name,
-            # Lets netbox_asset_tag (and similar) match this device against
-            # inventory by serial instead of by IP.
-            serial_number=coordinator.data.get("identifier"),
         )
 
     # ---------- control ----------

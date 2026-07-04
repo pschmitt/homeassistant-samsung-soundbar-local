@@ -33,17 +33,27 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
 
 ### Changes from upstream
 
-- **Device identifier / serial number**: the soundbar's `getIdentifier` value is
-  now surfaced as the device's `serial_number` in the device registry, so
-  inventory tools (e.g. NetBox asset-tag matching) can match this device by
-  serial instead of by IP.
+- **MAC address**: the soundbar's protocol has no MAC query, so the MAC is
+  looked up best-effort in the kernel neighbor (ARP) table (populated by the
+  polling traffic to the device, see `helpers.py`) and surfaced as a
+  `connections` entry on the device, the same technique used in
+  [homeassistant-tesmart-kvm](https://github.com/pschmitt/homeassistant-tesmart-kvm).
+  Inventory tools that match HA devices by MAC (e.g. NetBox asset-tag
+  matching, if the NetBox device record has the interface MAC set) can use
+  this to identify the device.
+- **`getIdentifier` is not a serial number**: it turns out to be a
+  per-*model* string (e.g. `22_AV_HW-S67GD`, shared by every unit of that
+  model), not a per-unit serial - Samsung's local API has no way to read the
+  device's actual printed serial. It's surfaced as `model_id` on the device
+  instead of (incorrectly) as `serial_number`.
 - **Reconfigure support**: `config_flow.py` now implements
   `async_step_reconfigure`, so a device whose IP changed can be repointed via
   **Settings → Devices & Services → (device) → ⋮ → Reconfigure** instead of
   deleting and re-adding the integration. The config entry's `unique_id` is
-  migrated from the IP to the device's own identifier (when available) so
-  reconfiguring correctly recognizes "same device, new address" instead of
-  aborting as a mismatch.
+  migrated from the IP to the device's MAC (when resolvable) so reconfiguring
+  correctly recognizes "same device, new address" instead of aborting as a
+  mismatch - unlike `getIdentifier`, the MAC is actually unique per physical
+  unit.
 
 ---
 
