@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.config_entries import ConfigEntry
 
 from .const import DOMAIN
-from .soundbar import AsyncSoundbar
+from .soundbar import AsyncSoundbar, SoundbarApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,11 +128,26 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
 
     async def async_volume_up(self) -> None:
         await self._soundbar.volume_up()
-        await self.coordinator.async_request_refresh()
+        await self._async_refresh_volume_only()
 
     async def async_volume_down(self) -> None:
         await self._soundbar.volume_down()
-        await self.coordinator.async_request_refresh()
+        await self._async_refresh_volume_only()
+
+    async def _async_refresh_volume_only(self) -> None:
+        # A full coordinator refresh calls status(), which makes 7 sequential
+        # API round-trips (power/volume/mute/input/sound_mode/codec/
+        # identifier) - that's what made the volume readout visibly lag
+        # behind the VOL_UP/VOL_DOWN button press. VOL_UP/VOL_DOWN only ever
+        # change the volume, so fetch just that and patch it into the
+        # coordinator's cached data instead of waiting on everything else.
+        # The regular poll interval still reconciles the rest.
+        try:
+            volume = await self._soundbar.volume()
+        except SoundbarApiError:
+            return
+        self.coordinator.data["volume"] = volume
+        self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
         # There's no direct "set volume to N" call - set_volume() walks
