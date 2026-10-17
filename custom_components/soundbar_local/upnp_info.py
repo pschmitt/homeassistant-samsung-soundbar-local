@@ -14,7 +14,6 @@ info endpoint (port 8001) expose it.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TypedDict
 from xml.etree import ElementTree
 
@@ -44,7 +43,7 @@ async def async_get_upnp_info(
             resp = await session.get(url)
             resp.raise_for_status()
             text = await resp.text()
-    except (aiohttp.ClientError, asyncio.TimeoutError):
+    except (TimeoutError, aiohttp.ClientError):
         return None
 
     try:

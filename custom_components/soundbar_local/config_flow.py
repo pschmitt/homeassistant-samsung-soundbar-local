@@ -23,9 +23,7 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST)): str,
-            vol.Optional(
-                CONF_VERIFY_SSL, default=defaults.get(CONF_VERIFY_SSL, False)
-            ): bool,
+            vol.Optional(CONF_VERIFY_SSL, default=defaults.get(CONF_VERIFY_SSL, False)): bool,
         }
     )
 
@@ -64,9 +62,7 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             mac = await self.hass.async_add_executor_job(get_mac_address, host)
         return format_mac(mac) if mac else None
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the step when user initiates a flow via the UI."""
         errors: dict[str, str] = {}
 
@@ -81,17 +77,11 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # host if the MAC couldn't be resolved.
                 await self.async_set_unique_id(mac or user_input[CONF_HOST])
                 self._abort_if_unique_id_configured(updates=user_input)
-                return self.async_create_entry(
-                    title=user_input[CONF_HOST], data=user_input
-                )
+                return self.async_create_entry(title=user_input[CONF_HOST], data=user_input)
 
-        return self.async_show_form(
-            step_id="user", data_schema=_schema(), errors=errors
-        )
+        return self.async_show_form(step_id="user", data_schema=_schema(), errors=errors)
 
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle re-configuring an existing entry (e.g. after an IP change)."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
@@ -112,9 +102,7 @@ class SoundbarLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_dhcp(
-        self, discovery_info: DhcpServiceInfo
-    ) -> FlowResult:
+    async def async_step_dhcp(self, discovery_info: DhcpServiceInfo) -> FlowResult:
         """Handle discovery via DHCP.
 
         Two manifest matchers land here: the soundbar's own MAC OUI (a

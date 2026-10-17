@@ -9,7 +9,6 @@ is required for this GET, unlike the JSON-RPC control API on port 1516.
 
 from __future__ import annotations
 
-import asyncio
 from typing import TypedDict
 
 import aiohttp
@@ -39,7 +38,7 @@ async def async_get_tizen_info(
             resp = await session.get(url)
             resp.raise_for_status()
             data = await resp.json(content_type=None)
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+    except (TimeoutError, aiohttp.ClientError, ValueError):
         return None
 
     if not isinstance(data, dict):

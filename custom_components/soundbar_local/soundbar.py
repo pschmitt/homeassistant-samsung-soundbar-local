@@ -6,9 +6,8 @@ Should work on HW-Q990D, HW-Q930D, HW-Q800D, HW-QS730D, HW-S800D, HW-S801D, HW-S
 
 from __future__ import annotations
 
-import asyncio
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 import async_timeout
@@ -34,10 +33,10 @@ class AsyncSoundbar:
         self._session = session
         self._verify_ssl = verify_ssl
         self._timeout = timeout
-        self._token: Optional[str] = None
+        self._token: str | None = None
 
     # ------------------ internal helpers ------------------
-    async def _post(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
         raw = json.dumps(payload, separators=(",", ":"))
         try:
             async with async_timeout.timeout(self._timeout):
@@ -52,7 +51,7 @@ class AsyncSoundbar:
                 )
             resp.raise_for_status()
             data = await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             raise SoundbarApiError(str(err)) from err
 
         if "error" in data:
@@ -76,15 +75,27 @@ class AsyncSoundbar:
         return self._token
 
     # Power ----------------------------------
-    async def power_on(self):  await self._call("powerControl", power="powerOn")
-    async def power_off(self): await self._call("powerControl", power="powerOff")
+    async def power_on(self):
+        await self._call("powerControl", power="powerOn")
+
+    async def power_off(self):
+        await self._call("powerControl", power="powerOff")
 
     # Volume & mute --------------------------
-    async def volume_up(self):      await self._call("remoteKeyControl", remoteKey="VOL_UP")
-    async def volume_down(self):    await self._call("remoteKeyControl", remoteKey="VOL_DOWN")
-    async def sub_plus(self):       await self._call("remoteKeyControl", remoteKey="WOOFER_PLUS")
-    async def sub_minus(self):      await self._call("remoteKeyControl", remoteKey="WOOFER_MINUS")
-    async def mute_toggle(self):    await self._call("remoteKeyControl", remoteKey="MUTE")
+    async def volume_up(self):
+        await self._call("remoteKeyControl", remoteKey="VOL_UP")
+
+    async def volume_down(self):
+        await self._call("remoteKeyControl", remoteKey="VOL_DOWN")
+
+    async def sub_plus(self):
+        await self._call("remoteKeyControl", remoteKey="WOOFER_PLUS")
+
+    async def sub_minus(self):
+        await self._call("remoteKeyControl", remoteKey="WOOFER_MINUS")
+
+    async def mute_toggle(self):
+        await self._call("remoteKeyControl", remoteKey="MUTE")
 
     async def set_volume(self, level: int):
         """Step the volume up/down until it reaches `level`.
@@ -123,15 +134,28 @@ class AsyncSoundbar:
         await self._call("soundModeControl", soundMode=mode)
 
     # Helpers --------------------------------
-    async def volume(self) -> int:      return int((await self._call("getVolume"))["volume"])
-    async def is_muted(self) -> bool:   return bool((await self._call("getMute"))["mute"])
-    async def input(self) -> str:       return (await self._call("inputSelectControl"))["inputSource"]
-    async def sound_mode(self) -> str:  return (await self._call("soundModeControl"))["soundMode"]
-    async def power_state(self) -> str: return (await self._call("powerControl"))["power"]
-    async def codec(self) -> Optional[str]:       return (await self._call("getCodec")).get("codec")
-    async def identifier(self) -> Optional[str]:  return (await self._call("getIdentifier")).get("identifier")
+    async def volume(self) -> int:
+        return int((await self._call("getVolume"))["volume"])
 
-    async def status(self) -> Dict[str, Any]:
+    async def is_muted(self) -> bool:
+        return bool((await self._call("getMute"))["mute"])
+
+    async def input(self) -> str:
+        return (await self._call("inputSelectControl"))["inputSource"]
+
+    async def sound_mode(self) -> str:
+        return (await self._call("soundModeControl"))["soundMode"]
+
+    async def power_state(self) -> str:
+        return (await self._call("powerControl"))["power"]
+
+    async def codec(self) -> str | None:
+        return (await self._call("getCodec")).get("codec")
+
+    async def identifier(self) -> str | None:
+        return (await self._call("getIdentifier")).get("identifier")
+
+    async def status(self) -> dict[str, Any]:
         """Return a consolidated status dict."""
         return {
             "power": await self.power_state(),
