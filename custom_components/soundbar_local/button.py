@@ -42,7 +42,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities) -> Non
                 soundbar.sub_minus,
             ),
         ],
-        True,
+        False,
     )
 
 
@@ -73,7 +73,7 @@ class SoundbarWooferButton(CoordinatorEntity, ButtonEntity):
             manufacturer="Samsung",
             configuration_url=f"https://{host}:1516/",
             model=data.get("model") or "Soundbar",
-            model_id=coordinator.data.get("identifier"),
+            model_id=(coordinator.data or {}).get("identifier"),
             # The real, printed serial - see media_player.py.
             serial_number=data.get("serial_number"),
             sw_version=data.get("firmware"),

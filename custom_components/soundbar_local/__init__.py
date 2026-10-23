@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -11,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
@@ -54,66 +56,103 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         _LOGGER,
         name=f"soundbar_{entry.data[CONF_HOST]}",
+        config_entry=entry,
         update_method=_async_update_data,
         update_interval=timedelta(seconds=DEFAULT_POLL_INTERVAL),
     )
 
-    await coordinator.async_config_entry_first_refresh()
-
-    # `getIdentifier` turns out to be a per-*model* string (e.g.
-    # "22_AV_HW-S67GD"), not a per-unit serial - it's shared by every soundbar
-    # of the same model, so it's exposed as model_id (see media_player.py)
-    # but must not be used to key unique_id or serial_number.
-    identifier = coordinator.data.get("identifier")
-
-    # This soundbar runs the same Tizen stack as Samsung Smart TVs and
-    # exposes the same unauthenticated info endpoint (port 8001), which
-    # conveniently has the device's own display name, model number, MAC and
-    # firmware version - none of which are available over the JSON-RPC
-    # control API on port 1516.
-    tizen_info = await async_get_tizen_info(session, entry.data[CONF_HOST]) or {}
-    device_name = tizen_info.get("name")
-    model = tizen_info.get("model")
-    firmware = tizen_info.get("firmware")
-
-    # The device's UPnP "IP Control" descriptor (port 9110) has its actual
-    # printed serial number, which neither the JSON-RPC control API nor the
-    # Tizen info endpoint expose. Used as a fallback for name/model too, in
-    # case the Tizen endpoint didn't answer.
-    upnp_info = await async_get_upnp_info(session, entry.data[CONF_HOST]) or {}
-    serial_number = upnp_info.get("serial_number")
-    device_name = device_name or upnp_info.get("friendly_name")
-    model = model or upnp_info.get("model_name")
-
-    mac = tizen_info.get("mac")
-    if not mac:
-        # Fall back to a best-effort ARP-table lookup (same technique as
-        # homeassistant-tesmart-kvm) if the Tizen endpoint didn't answer.
-        mac = await hass.async_add_executor_job(get_mac_address, entry.data[CONF_HOST])
-    if mac:
-        mac = format_mac(mac)
-
-    # The soundbar's IP is used as the config entry's unique_id historically,
-    # but it's a connection detail, not a stable device identity - it changes
-    # if the device gets a new DHCP lease. Once we have the device's MAC
-    # (genuinely unique per physical unit), migrate the unique_id to it so a
-    # later reconfigure (IP change) can tell "same device, new address" apart
-    # from "different device" via _abort_if_unique_id_mismatch().
-    if mac and entry.unique_id != mac:
-        hass.config_entries.async_update_entry(entry, unique_id=mac)
-
-    hass.data[DOMAIN][entry.entry_id] = {
+    data = hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "soundbar": soundbar,
-        "identifier": identifier,
-        "mac": mac,
-        "device_name": device_name,
-        "model": model,
-        "firmware": firmware,
-        "serial_number": serial_number,
+        "identifier": None,
+        "mac": None,
+        "device_name": None,
+        "model": None,
+        "firmware": None,
+        "serial_number": None,
     }
 
+    async def _first_refresh() -> None:
+        await coordinator.async_refresh()
+        try:
+            async with asyncio.timeout(15):
+                await _metadata()
+        except (TimeoutError, OSError):
+            _LOGGER.debug("Soundbar metadata unavailable")
+
+    async def _metadata() -> None:
+        # `getIdentifier` turns out to be a per-*model* string (e.g.
+        # "22_AV_HW-S67GD"), not a per-unit serial - it's shared by every soundbar
+        # of the same model, so it's exposed as model_id (see media_player.py)
+        # but must not be used to key unique_id or serial_number.
+        identifier = (coordinator.data or {}).get("identifier")
+
+        # This soundbar runs the same Tizen stack as Samsung Smart TVs and
+        # exposes the same unauthenticated info endpoint (port 8001), which
+        # conveniently has the device's own display name, model number, MAC and
+        # firmware version - none of which are available over the JSON-RPC
+        # control API on port 1516.
+        tizen_info, upnp_info = await asyncio.gather(
+            async_get_tizen_info(session, entry.data[CONF_HOST]),
+            async_get_upnp_info(session, entry.data[CONF_HOST]),
+        )
+        tizen_info = tizen_info or {}
+        upnp_info = upnp_info or {}
+        device_name = tizen_info.get("name")
+        model = tizen_info.get("model")
+        firmware = tizen_info.get("firmware")
+
+        # The device's UPnP "IP Control" descriptor (port 9110) has its actual
+        # printed serial number, which neither the JSON-RPC control API nor the
+        # Tizen info endpoint expose. Used as a fallback for name/model too, in
+        # case the Tizen endpoint didn't answer.
+        serial_number = upnp_info.get("serial_number")
+        device_name = device_name or upnp_info.get("friendly_name")
+        model = model or upnp_info.get("model_name")
+
+        mac = tizen_info.get("mac")
+        if not mac:
+            # Fall back to a best-effort ARP-table lookup (same technique as
+            # homeassistant-tesmart-kvm) if the Tizen endpoint didn't answer.
+            mac = await hass.async_add_executor_job(get_mac_address, entry.data[CONF_HOST])
+        if mac:
+            mac = format_mac(mac)
+
+        # The soundbar's IP is used as the config entry's unique_id historically,
+        # but it's a connection detail, not a stable device identity - it changes
+        # if the device gets a new DHCP lease. Once we have the device's MAC
+        # (genuinely unique per physical unit), migrate the unique_id to it so a
+        # later reconfigure (IP change) can tell "same device, new address" apart
+        # from "different device" via _abort_if_unique_id_mismatch().
+        if mac and entry.unique_id != mac:
+            hass.config_entries.async_update_entry(entry, unique_id=mac)
+
+        data.update(
+            identifier=identifier,
+            mac=mac,
+            device_name=device_name,
+            model=model,
+            firmware=firmware,
+            serial_number=serial_number,
+        )
+        registry = dr.async_get(hass)
+        registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.data[CONF_HOST])},
+            connections={(dr.CONNECTION_NETWORK_MAC, mac)} if mac else set(),
+            name=device_name or entry.title,
+            model=model,
+            model_id=identifier,
+            manufacturer="Samsung",
+            sw_version=firmware,
+            serial_number=serial_number,
+        )
+        coordinator.async_update_listeners()
+
+    if coordinator.data is None:
+        coordinator.last_update_success = False
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_create_background_task(hass, _first_refresh(), "soundbar_first_refresh")
     return True
 
 

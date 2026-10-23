@@ -59,7 +59,7 @@ async def async_setup_entry(hass, entry: ConfigEntry, async_add_entities):
     coordinator = data["coordinator"]
     soundbar: AsyncSoundbar = data["soundbar"]
 
-    async_add_entities([SoundbarLocalEntity(coordinator, soundbar, entry, data)], True)
+    async_add_entities([SoundbarLocalEntity(coordinator, soundbar, entry, data)])
 
 
 class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
@@ -106,7 +106,7 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             # getIdentifier() returns a per-*model* string (e.g.
             # "22_AV_HW-S67GD"), not a per-unit serial - expose it as the
             # model identifier, not as serial_number.
-            model_id=coordinator.data.get("identifier"),
+            model_id=(coordinator.data or {}).get("identifier"),
             # The real, printed serial - from the UPnP "IP Control"
             # descriptor (port 9110), not from the JSON-RPC/Tizen APIs.
             # Passed explicitly (even when None) rather than omitted, since
@@ -184,26 +184,26 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
     # ---------- properties ----------
     @property
     def state(self):
-        power = self.coordinator.data.get("power")
+        power = (self.coordinator.data or {}).get("power")
         return STATE_ON if power == "powerOn" else STATE_OFF
 
     @property
     def volume_level(self):
         if self._optimistic_volume is not None:
             return self._optimistic_volume
-        return self.coordinator.data.get("volume", 0) / 100
+        return (self.coordinator.data or {}).get("volume", 0) / 100
 
     @property
     def is_volume_muted(self):
-        return self.coordinator.data.get("mute", False)
+        return (self.coordinator.data or {}).get("mute", False)
 
     @property
     def source(self):
-        return self.coordinator.data.get("input")
+        return (self.coordinator.data or {}).get("input")
 
     @property
     def sound_mode(self):
-        return self.coordinator.data.get("sound_mode")
+        return (self.coordinator.data or {}).get("sound_mode")
 
     # ---------- coordinator update ----------
     @callback
