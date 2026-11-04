@@ -146,13 +146,14 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             volume = await self._soundbar.volume()
         except SoundbarApiError:
             return
-        self.coordinator.data["volume"] = volume
+        if self.coordinator.data is not None:
+            self.coordinator.data["volume"] = volume
         self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
-        # There's no direct "set volume to N" call - set_volume() walks
-        # there one VOL_UP/VOL_DOWN step at a time (see soundbar.py), which
-        # is visibly slow for a big jump. Report the requested value right
+        # Models without the one-request volumeControl call fall back to
+        # walking there one VOL_UP/VOL_DOWN step at a time (see soundbar.py),
+        # which is visibly slow for a big jump. Report the requested value right
         # away instead of leaving the UI on the old one for the several
         # seconds that takes; async_request_refresh() below reconciles it
         # against the real device value once the walk finishes (or clears
@@ -169,9 +170,8 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
             await self.coordinator.async_request_refresh()
 
     async def async_mute_volume(self, mute: bool) -> None:
-        if mute != self.is_volume_muted:
-            await self._soundbar.mute_toggle()
-            await self.coordinator.async_request_refresh()
+        await self._soundbar.set_mute(mute)
+        await self.coordinator.async_request_refresh()
 
     async def async_select_source(self, source: str) -> None:
         await self._soundbar.select_input(source)
@@ -191,11 +191,13 @@ class SoundbarLocalEntity(CoordinatorEntity, MediaPlayerEntity):
     def volume_level(self):
         if self._optimistic_volume is not None:
             return self._optimistic_volume
-        return (self.coordinator.data or {}).get("volume", 0) / 100
+        # None when the model lacks a readable volume, see AsyncSoundbar.status()
+        volume = (self.coordinator.data or {}).get("volume")
+        return None if volume is None else volume / 100
 
     @property
     def is_volume_muted(self):
-        return (self.coordinator.data or {}).get("mute", False)
+        return (self.coordinator.data or {}).get("mute")
 
     @property
     def source(self):
