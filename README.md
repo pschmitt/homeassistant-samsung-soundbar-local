@@ -1,155 +1,49 @@
-# Samsung Soundbar **Local** – Home Assistant Integration
+<p align="center">
+  <img src="logo.png" width="128" alt="Samsung Soundbar Local logo">
+</p>
 
-<img src="logo.png" alt="Samsung Soundbar Local logo" width="200">
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&amp;repository=homeassistant-samsung-soundbar-local&amp;category=integration"><img src="https://my.home-assistant.io/badges/marketplace_repository.svg" alt="Open this integration in Home Assistant Marketplace"></a>
+</p>
 
-> **Local IP control for 2024-line Samsung Wi-Fi soundbars**
-> HW-Q990D · HW-Q800D · HW-QS730D · HW-S800D · HW-S801D · HW-S700D · HW-S60D · HW-S61D · HW-LS60D
+<h1 align="center">Samsung Soundbar Local</h1>
 
-This is a fork of [ZtF/hass-samsung-soundbar-local](https://github.com/ZtF/hass-samsung-soundbar-local),
-kept as the source for the `soundbar_local` integration deployed from
-[pschmitt/homeassistant](https://github.com/pschmitt) (see that repo's
-`custom_components-local/` for the deployment convention). The domain is
-`soundbar_local` (not `samsung_soundbar_local` as in the upstream folder
-layout) to match what's already registered in that Home Assistant instance.
+<p align="center">Control supported 2024 Samsung Wi-Fi soundbars over the local network.</p>
 
----
+This is a fork of [ZtF's Samsung Soundbar Local](https://github.com/ZtF/hass-samsung-soundbar-local).
+It uses the `soundbar_local` integration domain and requires Home Assistant
+2023.12 or later. See [Device control](docs/device-control.md) for models and
+requirements.
 
-## What is it?
+## Features
 
-`soundbar_local` is a custom Home Assistant component that talks **directly** to your 2024 Samsung soundbar over the LAN (TCP 1516, same JSON-RPC API used by the SmartThings app).
-No cloud, no SmartThings integration in Home Assistant – everything stays on your network.
+- **Media playback:** Turn the soundbar on or off and adjust volume, mute, input and sound mode.
+- **Local API:** Use the soundbar's LAN JSON-RPC interface rather than a Home Assistant cloud integration.
+- **Device discovery:** Identify the unit by its serial and MAC where available, and follow DHCP address changes. See [Device control](docs/device-control.md).
+- **Reconfiguration:** Change the soundbar's address from the integration UI.
 
-### Key features
+## Install
 
-| Function | Details |
-|----------|---------|
-| Power control | `turn_on`, `turn_off` |
-| Audio | volume **set / step / mute** |
-| Subwoofer | woofer ± via `button.py` (not enabled by default, see `const.PLATFORMS`) |
-| Inputs | HDMI1, E-ARC, ARC, Digital, Bluetooth, Wi-Fi |
-| Sound modes | Standard, Surround, Game, Movie, Music, Clear Voice, DTS Virtual X, Adaptive |
+Use the Marketplace badge above on Home Assistant 2026.11 or later to add this
+repository as a custom integration. On older versions, add it as a HACS
+custom repository of type **Integration**. Install and restart Home Assistant.
+The badge does not imply a public catalog listing. For manual installation,
+copy `custom_components/soundbar_local/` into Home Assistant's
+`custom_components/` directory and restart.
 
-The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboards, automations and scripts just like any other media-player device.
+## Quick start
 
-### Changes from upstream
+1. Add the soundbar to SmartThings and enable **IP control** on the device.
+2. Add **Samsung Soundbar Local** under **Settings → Devices & services → Add integration**.
+3. Enter the soundbar's address, then use the media player entity to select an input or change volume.
 
-- **MAC address**: the soundbar's protocol has no MAC query, so the MAC is
-  looked up best-effort in the kernel neighbor (ARP) table (populated by the
-  polling traffic to the device, see `helpers.py`) and surfaced as a
-  `connections` entry on the device, the same technique used in
-  [homeassistant-tesmart-kvm](https://github.com/pschmitt/homeassistant-tesmart-kvm).
-  Inventory tools that match HA devices by MAC (e.g. NetBox asset-tag
-  matching, if the NetBox device record has the interface MAC set) can use
-  this to identify the device.
-- **`getIdentifier` is not a serial number**: it turns out to be a
-  per-*model* string (e.g. `22_AV_HW-S67GD`, shared by every unit of that
-  model), not a per-unit serial. It's surfaced as `model_id` on the device
-  instead of (incorrectly) as `serial_number`.
-- **Real serial number**: the device's actual printed serial *is* available,
-  just not from the JSON-RPC or Tizen APIs - it's in the UPnP "IP Control"
-  device descriptor at `http://<host>:9110/ip_control` (the same one SSDP
-  advertises for `urn:samsung.com:device:IPControlServer:1`; see
-  `upnp_info.py`). Surfaced as the real `serial_number` on the device, which
-  is what lets inventory tools like NetBox asset-tag matching identify this
-  exact unit (not just its model).
-- **Reconfigure support**: `config_flow.py` now implements
-  `async_step_reconfigure`, so a device whose IP changed can be repointed via
-  **Settings → Devices & Services → (device) → ⋮ → Reconfigure** instead of
-  deleting and re-adding the integration. The config entry's `unique_id` is
-  migrated from the IP to the device's MAC (when resolvable) so reconfiguring
-  correctly recognizes "same device, new address" instead of aborting as a
-  mismatch - unlike `getIdentifier`, the MAC is actually unique per physical
-  unit.
-- **DHCP discovery, including auto-repointing on IP change**: this soundbar
-  runs the same Tizen stack as Samsung Smart TVs and exposes the same
-  unauthenticated info endpoint (`http://<host>:8001/api/v2/`, see
-  `tizen_info.py`) used by the official `samsungtv` integration. It's queried
-  for the device's own display name (e.g. "Living room speaker", as set in
-  the SmartThings app), model number and MAC - none of which are available
-  over the JSON-RPC control API on port 1516. `manifest.json` declares two
-  `dhcp` matchers: the soundbar's MAC OUI (`B0E45C*`, for genuinely new
-  devices - actively probed via the control API before showing a discovery
-  prompt, since the OUI is shared with other Samsung product lines) and
-  `registered_devices: true` (so an already-configured soundbar that gets a
-  new DHCP lease has its host silently updated in place - the same mechanism
-  as [home-assistant/core#175327](https://github.com/home-assistant/core/pull/175327)).
-  The device's own name is also used as the default entity/device name
-  instead of `Soundbar <ip>`.
-- **"Visit" button**: `DeviceInfo.configuration_url` points at
-  `https://<host>:1516/`, the soundbar's own JSON-RPC control endpoint. It
-  won't render anything useful in a browser (JSON-RPC POST only), but it's a
-  one-click way to confirm which host/port the integration is talking to.
-- **Volume no longer drifts**: there's no direct "set volume to N" call,
-  only relative `VOL_UP`/`VOL_DOWN` steps, and the original `set_volume()`
-  tracked progress with a locally-simulated counter instead of the device's
-  real volume. A single step doesn't always move by exactly 1 (coalesced or
-  dropped under rapid calls), so the simulated counter could drift from
-  reality and the loop would declare success on the wrong value - showing up
-  as an unexpected "in-between" volume once the coordinator polled the real
-  state. It now re-reads the actual volume after every step instead (with a
-  stall guard so it gives up instead of looping forever at a hard limit).
-- **Optimistic volume_set**: walking to the target one step at a time is
-  visibly slow for a big jump, so `async_set_volume_level()` reports the
-  requested value immediately instead of leaving the UI on the old value
-  for the several seconds the walk takes. The optimistic guess is cleared
-  as soon as the walk finishes (success or failure), at which point the
-  coordinator refresh takes back over with the real value.
+## Documentation
 
----
-
-## Supported models
-
-* HW-Q990D  – HW-Q800D  – HW-QS730D
-* HW-S800D  – HW-S801D  – HW-S700D  – HW-S60D  – HW-S61D  – HW-LS60D
-
-> Older (2023 and below) bars do **not** implement the same API and will **not** work.
-
----
-
-## Requirements
-
-* Home Assistant 2023.12 or newer
-* Python 3.11 (bundled with HA OS / Container)
-* Your soundbar **added to the Samsung SmartThings app, connected to Wi-Fi** and
-  **"IP control" enabled** in the device settings.
-  This setting allows the bar to produce an *Access Token* that the integration uses.
-
----
-
-## Installation
-
-### Home Assistant 2026.11 and newer
-
-[![Open this integration in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&repository=homeassistant-samsung-soundbar-local&category=integration)
-
-Click the badge to add the repository, then install the integration. Restart
-Home Assistant and add it from **Settings → Devices & services**.
-
-### HACS (older installations)
-
-For Home Assistant versions before 2026.11, add
-`https://github.com/pschmitt/homeassistant-samsung-soundbar-local` as a
-custom repository of type **Integration** in HACS. Install the integration
-and restart Home Assistant.
-
-### Manual
-
-Copy `custom_components/soundbar_local` into your Home Assistant `custom_components/`
-directory, restart Home Assistant, then go to **Settings → Devices & Services →
-+ Add Integration**, search for **"Samsung Soundbar Local"**, enter the
-soundbar's IP address and confirm.
-
----
-
-## Branding
-
-This repository bundles a modified version of the official SmartThings icon
-(`brand/`, `icon.png`, `logo.png`) with an "L" badge added to distinguish this
-**local**-polling integration from the official cloud-based SmartThings
-integration in the Home Assistant UI. SmartThings and related marks belong to
-Samsung Electronics. The integration code is MIT-licensed (see `LICENSE`), but
-the bundled Samsung/SmartThings artwork is not relicensed under MIT.
+| Topic | Description |
+|-------|-------------|
+| [Device control](docs/device-control.md) | Supported models, identification, DHCP discovery and volume |
 
 ## License
 
-MIT, see `LICENSE`. Original work Copyright (c) 2025 ZtF.
+[MIT](LICENSE). Samsung/SmartThings artwork belongs to Samsung and is not
+relicensed under MIT.
