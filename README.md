@@ -118,6 +118,22 @@ The entity is exposed as `media_player.soundbar_<ipaddr>` and works with dashboa
 
 ## Installation
 
+### Home Assistant 2026.11 and newer
+
+[![Open this integration in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&repository=homeassistant-samsung-soundbar-local&category=integration)
+
+Click the badge to add the repository, then install the integration. Restart
+Home Assistant and add it from **Settings → Devices & services**.
+
+### HACS (older installations)
+
+For Home Assistant versions before 2026.11, add
+`https://github.com/pschmitt/homeassistant-samsung-soundbar-local` as a
+custom repository of type **Integration** in HACS. Install the integration
+and restart Home Assistant.
+
+### Manual
+
 Copy `custom_components/soundbar_local` into your Home Assistant `custom_components/`
 directory, restart Home Assistant, then go to **Settings → Devices & Services →
 + Add Integration**, search for **"Samsung Soundbar Local"**, enter the
